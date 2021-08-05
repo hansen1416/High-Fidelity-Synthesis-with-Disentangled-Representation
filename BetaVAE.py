@@ -1,21 +1,7 @@
 
-import random
-from math import sqrt
-
-import numpy as np
 import torch
 from torch import nn
-import torch.optim as optim
-from torch import distributions
 import torch.nn.functional as F
-from torchvision import transforms
-from torchvision.utils import make_grid
-from torch.utils.tensorboard import SummaryWriter
-import torchvision.datasets as datasets
-
-from tqdm.notebook import tqdm
-
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def normal_init(m):
     if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d, nn.Linear)):
@@ -93,3 +79,39 @@ class Decoder(nn.Module):
     def forward(self, c):
         x = self.layer(c)
         return x
+
+class BetaVAE_H(nn.Module):
+    """Model proposed in original beta-VAE paper(Higgins et al, ICLR, 2017)."""
+
+    def __init__(self, c_dim=10, nc=3, infodistil_mode=False):
+        super(BetaVAE_H, self).__init__()
+        self.c_dim = c_dim
+        self.nc = nc
+        self.encoder = Encoder(c_dim, nc, infodistil_mode)
+        self.decoder = Decoder(c_dim, nc)
+        self.apply(normal_init)
+
+    def forward(self, x, c, encode_only, decode_only):
+        if encode_only:
+            c, mu, logvar = self._encode(x)
+            return c, mu, logvar
+        elif decode_only:
+            x_recon = self._decode(c)
+            return x_recon
+        else:
+            c, mu, logvar = self._encode(x)
+            x_recon = self._decode(c)
+            return x_recon, c, mu, logvar
+
+    def __call__(self, x=None, c=None, encode_only=False, decode_only=False):
+        return self.forward(x, c, encode_only, decode_only)
+
+    def _encode(self, x):
+        distributions = self.encoder(x)
+        mu = distributions[:, :self.c_dim]
+        logvar = distributions[:, self.c_dim:]
+        c = reparametrize(mu, logvar)
+        return c, mu, logvar
+
+    def _decode(self, c):
+        return self.decoder(c)

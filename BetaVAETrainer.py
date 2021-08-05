@@ -1,3 +1,25 @@
+import os
+import sys
+import random
+from math import sqrt
+
+import numpy as np
+import torch
+from torch import nn
+import torch.optim as optim
+from torch import distributions
+import torch.nn.functional as F
+from torchvision import transforms
+from torchvision.utils import make_grid
+from torch.utils.tensorboard import SummaryWriter
+import torchvision.datasets as datasets
+from tqdm import tqdm
+
+from BetaVAE import BetaVAE_H, normal_init
+from Dataloader import return_data
+
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
 def reconstruction_loss(x, x_recon, distribution):
     batch_size = x.size(0)
     assert batch_size != 0
@@ -171,3 +193,23 @@ class Solver(object):
             tqdm.write("=> loaded checkpoint '{} (iter {})'".format(file_path, self.global_iter))
         else:
             tqdm.write("=> no checkpoint found at '{}'".format(file_path))
+
+if __name__== "__main__":
+
+    torch.backends.cudnn.enabled =True  # 说明设置为使用使用非确定性算法
+    torch.backends.cudnn.benchmark = True
+
+    seed = 46
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+
+    project_dir = '/home/hlz/High-Fidelity-Synthesis-with-Disentangled-Representation'
+
+    celeba64dataloader = return_data()
+
+    net = Solver(max_iter=500000, data_loader=celeba64dataloader, load_ckpt=250000)
+
+    net.train()
